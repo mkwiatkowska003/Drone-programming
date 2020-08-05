@@ -9,7 +9,6 @@ import argparse
 import imutils
 import time
 import cv2
-import realsense_rgbdepth
 
 # initialize the list of class labels MobileNet SSD was trained to
 # detect, then generate a set of bounding box colors for each class
@@ -23,9 +22,9 @@ COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
 def agr_parser():
     """construct the argument parse and parse the arguments"""
     ap = argparse.ArgumentParser()
-    ap.add_argument("-p", "--prototxt", required=False, default="C:/Users/marta/PycharmProjects/realsense/MobileNet-SSD-RealSense-master/caffemodel/MobileNetSSD/MobileNetSSD_deploy.prototxt",
+    ap.add_argument("-p", "--prototxt", required=False, default="C:/Users/marta/Desktop/repos/Drone-programming/UAV.OpenCV.Algorithms.RealsenceDepthCamera/realsense/MobileNet-SSD-RealSense-master/caffemodel/MobileNetSSD/MobileNetSSD_deploy.prototxt",
                     help="path to Caffe 'deploy' prototxt file")
-    ap.add_argument("-m", "--model", required=False, default="C:/Users/marta/PycharmProjects/realsense/MobileNet-SSD-RealSense-master/caffemodel/MobileNetSSD/MobileNetSSD_deploy.caffemodel",
+    ap.add_argument("-m", "--model", required=False, default="C:/Users/marta/Desktop/repos/Drone-programming/UAV.OpenCV.Algorithms.RealsenceDepthCamera/realsense/MobileNet-SSD-RealSense-master/caffemodel/MobileNetSSD/MobileNetSSD_deploy.caffemodel",
                     help="path to Caffe pre-trained model")
     ap.add_argument("-c", "--confidence", type=float, default=0.2,
                     help="minimum probability to filter weak detections")
