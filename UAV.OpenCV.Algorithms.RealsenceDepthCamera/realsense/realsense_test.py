@@ -1,9 +1,9 @@
 import pyrealsense2 as rs
 import numpy as np
+from datetime import datetime
 import cv2
-import os
-
-face_cascade = cv2.CascadeClassifier('C:/Users/marta/Desktop/repos/Drone-programming/venv/Lib/site-packages/cv2/data/haarcascade_frontalface_default.xml')
+import open3d
+import time
 
 # Configure depth and color streams
 pipeline = rs.pipeline()
@@ -12,90 +12,57 @@ config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
 # Start streaming
-pipe_profile = pipeline.start(config)
+pipeline.start(config)
+align = rs.align(rs.stream.color)
 
-curr_frame = 0
+vis = open3d.visualization.Visualizer()
+vis.create_window('PCD', width=1280, height=720)
+pointcloud = open3d.geometry.PointCloud()
+geom_added = False
 
-try:
-    while True:
+while True:
+    dt0 = datetime.now()
+    frames = pipeline.wait_for_frames()
+    frames = align.process(frames)
+    profile = frames.get_profile()
+    depth_frame = frames.get_depth_frame()
+    color_frame = frames.get_color_frame()
+    if not depth_frame or not color_frame:
+        continue
 
-        # Wait for a coherent pair of frames: depth and color
-        frames = pipeline.wait_for_frames()
-        depth_frame = frames.get_depth_frame()
-        color_frame = frames.get_color_frame()
-        if not depth_frame or not color_frame:
-            continue
+    # Convert images to numpy arrays
+    depth_image = np.asanyarray(depth_frame.get_data())
+    color_image = np.asanyarray(color_frame.get_data())
 
-        # Intrinsics & Extrinsics
-        depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
-        color_intrin = color_frame.profile.as_video_stream_profile().intrinsics
-        depth_to_color_extrin = depth_frame.profile.get_extrinsics_to(
-            color_frame.profile)
+    img_depth = open3d.geometry.Image(depth_image)
+    img_color = open3d.geometry.Image(color_image)
 
-        # print(depth_intrin.ppx, depth_intrin.ppy)
+    rgbd = open3d.geometry.RGBDImage.create_from_color_and_depth(img_color, img_depth, convert_rgb_to_intensity=False)
 
-        # Convert images to numpy arrays
-        depth_image = np.asanyarray(depth_frame.get_data())
-        color_image = np.asanyarray(color_frame.get_data())
+    intrinsics = profile.as_video_stream_profile().get_intrinsics()
+    pinhole_camera_intrinsic = open3d.camera.PinholeCameraIntrinsic(intrinsics.width, intrinsics.height, intrinsics.fx, intrinsics.fy,
+                                                      intrinsics.ppx, intrinsics.ppy)
+    pcd = open3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
+    pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
 
-        # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+    pointcloud.points = pcd.points
+    pointcloud.colors = pcd.colors
 
-        # Stack both images horizontally
-        images = np.hstack((color_image, depth_colormap))
+    if geom_added == False:
+        vis.add_geometry(pointcloud)
+        geom_added = True
 
-        # Show images
-        cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
-        cv2.imshow('RealSense', images)
+    vis.update_geometry()
+    vis.reset_view_point(False)
+    vis.poll_events()
+    vis.update_renderer()
 
-        # find the human face in the color_image
-        gray = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-        for (x, y, w, h) in faces:
-            if curr_frame > 100 and curr_frame % 40 == 10:
-                roi_depth_image = depth_image[y:y+h, x:x+w]
-                roi_color_image = color_image[y:y+h, x:x+w]
+    cv2.imshow('bgr', color_image)
+    key = cv2.waitKey(1)
+    if key == ord('q'):
+        break
 
-                os.system('mkdir %d' % curr_frame)
-                cv2.imwrite('%d/depth.jpg' %
-                            curr_frame, roi_depth_image)
-                print("save depth image")
-                cv2.imwrite('%d/color.jpg' %
-                            curr_frame, roi_color_image)
-                print("save color image")
-                print("the mid position depth is:", depth_frame.get_distance(
-                    int(x+w/2), int(y+h/2)))
-
-                # write the depth data in a depth.txt
-                with open('%d/depth.csv' % curr_frame, 'w') as f:
-                    cols = list(range(x, x+w))
-                    rows = list(range(y, y+h))
-                    for i in rows:
-                        for j in cols:
-                            depth = depth_frame.get_distance(j, i)
-                            depth_point = rs.rs2_deproject_pixel_to_point(
-                                depth_intrin, [j, i], depth)
-                            text = "%d: %.5lf, %.5lf, %.5lf\n" % (
-                                curr_frame, depth_point[0], depth_point[1], depth_point[2])
-                            f.write(text)
-                print("Finish writing the depth img")
-
-            cv2.rectangle(color_image, (x, y), (x+w, y+h), (255, 0, 0), 2)
-
-         # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(
-            depth_image, alpha=0.03), cv2.COLORMAP_JET)
-
-        # Stack both images horizontally
-        images = np.hstack((color_image, depth_colormap))
-
-        # Show images
-        cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
-        cv2.imshow('RealSense', images)
-        cv2.waitKey(1)
-
-        curr_frame += 1
-finally:
-
-    # Stop streaming
-    pipeline.stop()
+pipeline.stop()
+cv2.destroyAllWindows()
+vis.destroy_window()
+del vis
