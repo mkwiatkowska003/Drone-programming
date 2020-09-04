@@ -54,28 +54,6 @@ def detect_marker(frame, lower_color_value, upper_color_value, color_name, color
     
 def check_points(Detected_Points, blue_point, red_point, yellow_point):
     
-    # if any(p == 0 for p in Detected_Points):
-    #     if Detected_Points[0] == 0:
-    #         if red_point[1] > yellow_point[1] > 0 :
-    #             return 1
-    #         else:
-    #             return 0
-    #     elif Detected_Points[1] == 0:
-    #         if blue_point[1] > yellow_point[1] > 0 :
-    #             return 1
-    #         else:
-    #             return 0
-    #     elif Detected_Points[2] == 0:
-    #         if blue_point[1] > red_point[1] > 0:
-    #             return 1
-    #         else:
-    #             return 0
-    # else:
-    #     if blue_point[1] > red_point[1] > yellow_point[1]:
-    #         return 1
-    #     else:
-    #         return 0
-
     r = range(blue_point[0] - 30, blue_point[0] + 30)
     if blue_point[1] > red_point[1] > yellow_point[1] and blue_point[0] in r and red_point[0] in r and yellow_point[0] in r:
         return 1
